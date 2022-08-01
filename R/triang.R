@@ -36,9 +36,9 @@ triang <- function(f,data,method="mle",subset=TRUE,...){
     )
   
   ## group on all but the first three columns (x,y,bearing)
-  triangs = ddply(df,names(df)[-(1:3)],methodF,...)
-  coordinates(triangs)=~x+y
-  proj4string(triangs) = proj4string(data)
+  triangs = plyr::ddply(df,names(df)[-(1:3)],methodF,...)
+  sp::coordinates(triangs)=~x+y
+  sp::proj4string(triangs) = sp::proj4string(data)
   triangs
   
 }
@@ -48,7 +48,7 @@ triang <- function(f,data,method="mle",subset=TRUE,...){
   if(inherits(data,"Spatial")){
     data=data@data
   }
-  parsed = latticeParseFormula(f,data=data,subset=subset)
+  parsed = lattice::latticeParseFormula(f,data=data,subset=subset)
   if(!is.null(parsed$left)){
     stop("LHS of formula must be empty")
   }
@@ -68,7 +68,7 @@ triang <- function(f,data,method="mle",subset=TRUE,...){
 .getCoords <- function(data){
   coords = NULL
   if(inherits(data,"Spatial")){
-    coords = coordinates(data)
+    coords = sp::coordinates(data)
   }else{
     if("x" %in% names(data)){
       if("y" %in% names(data)){
