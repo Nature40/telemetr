@@ -1,0 +1,159 @@
+
+%\VignetteIndexEntry{Direction-finding Telemetry}
+
+\documentclass{article}
+
+\title{Using the {\tt telemetr} package}
+
+\begin{document}
+\maketitle
+
+\section*{Testing With Random Data}
+
+First we'll generate some random data. For each of two animals we'll get three bearings
+on a single day.
+
+<<>>=
+set.seed(999)
+library(telemetr)
+library(ggplot2)
+m = telemetr:::makeMoreTriData(ntowers=3,animals=letters[1:2],dates=Sys.Date())
+summary(m)
+@ 
+
+We'll plot the bearings, colouring by animal:
+
+<<fig=TRUE>>=
+plot(m)
+telemetr:::drawVectors(~bearing|animal,m)
+@ 
+
+Now we locate using two methods:
+
+<<>>=
+trmr = triang(~bearing|animal,m,method="rmr")
+tmle = triang(~bearing|animal,m,method="mle")
+@ 
+
+Next we plot the points and the location estimates:
+
+<<fig=TRUE>>=
+plot(NA,xlim=range(coordinates(m)[,1],coordinates(trmr[,1]),coordinates(tmle[,1])),
+     ylim=range(coordinates(m)[,2],coordinates(trmr[,2]),coordinates(tmle[,2])))
+points(m)
+telemetr:::drawVectors(~bearing|animal,m)
+points(trmr,pch=19,col=1:2)
+points(tmle,pch=20,col=1:2)
+
+@ 
+
+\section*{Testing with Lenth Data}
+
+The sample data from Lenth's Technometrics article was typed in and is available
+the {\tt samples} folder. We read it in. One of the readings was used to test the robustness
+of the estimators, so we will add a flag column to the data. This table should be close to
+Lenth's table 1.
+
+<<>>=
+lenth = read.table(system.file("samples","lenth.dat",package="telemetr"))
+coordinates(lenth)=~x+y
+lenth$ok = 1
+lenth$ok[6]=0
+lenth
+@ 
+
+Now we loop over the methods and also whether to include the outlier or not.
+The resulting table should duplicate Lenth's table 2 once all the methods and
+error estimates are working:
+
+<<>>=
+results = data.frame(method=NULL,x=NULL,y=NULL)
+for(subset in list(lenth$ok==1,TRUE)){
+  for(method in c("mle","hub","and","rmr")){
+    tri = triang(~bearing,lenth,method=method,subset=subset)
+    results=rbind(results,data.frame(
+      npts=tri$npts,method=method,
+      x=coordinates(tri)[,1],y=coordinates(tri)[,2]))
+  }
+}
+options(digits=3)
+  results
+@ 
+
+Currently the point estimates are exact, or close to 1dp for most cases.
+
+The following plot emulates Lenth's figure 1:
+
+<<fig=TRUE>>=
+plot(coordinates(lenth),xlim=c(0,10),ylim=c(0,10),bty="l",type="n",asp=1)
+text(coordinates(lenth)[,1],coordinates(lenth)[,2]+.3,as.character(1:nrow(lenth)))
+axis(1)
+axis(2)
+
+drawVectors(~bearing,lenth,subset=lenth$ok==1)
+
+@ 
+
+We can try and emulate Lenth's figure 3 but the labelling is problematic. 
+
+<<fig=TRUE>>=
+coordinates(results)=~x+y
+plot(coordinates(results),type="n",asp=1,bty="l")
+plot(results,add=TRUE)
+text(coordinates(results),paste(results$method,results$npts))
+@ 
+
+Another option is to use {\tt ggplot} to style the points:
+
+<<fig=TRUE>>=
+print(
+      ggplot(as.data.frame(results))+
+   geom_point(aes(x=x,y=y,colour=method,pch=as.factor(npts)),cex=3)+coord_fixed()
+      )
+@ 
+
+\section*{Demo Data}
+
+Another batch of demo data was supplied with the Fortran source code. This consisted of
+a number of azimuths from three towers (although a tower location file with 8 towers 
+was supplied, only three seem to be used in the data). This was converted into a spatial
+points data frame as {\tt azr} in the package.
+
+
+<<fig=TRUE>>=
+data(azr)
+mlefits = triang(~bearing|animal,azr,method="mle")
+rmrfits = triang(~bearing|animal,azr,method="rmr")
+andfits = triang(~bearing|animal,azr,method="and")
+bb = bbox(rbind(coordinates(azr),
+  coordinates(mlefits),
+  coordinates(rmrfits),
+  coordinates(andfits)))
+par(mfrow=c(4,4))
+par(mar=c(0,0,2,0))
+colours=c("#1B9E77", "#D95F02", "#7570B3", "#E7298A")
+for(i in 17:32){
+  bb = bbox(rbind(coordinates(azr),coordinates(rmrfits[i,]),
+    coordinates(mlefits[i,]),coordinates(andfits[i,])))
+  plot(SpatialPoints(t(bb)),cex=0)
+  plot(azr[azr$animal==i,],add=TRUE)
+  drawVectors(~bearing|animal,azr,subset=azr$animal==i)
+  points(rmrfits[i,],pch=19,col=colours[1],cex=3)
+  points(mlefits[i,],pch=19,col=colours[2],cex=2)
+  points(andfits[i,],pch=19,col=colours[4],cex=1.5)
+  box()
+  title(paste("Data ",i))
+}
+  
+@ 
+
+\section*{Appendix}
+
+
+On Finding the Source of a Signal
+Author(s): Russell V. Lenth
+Reviewed work(s):
+Source: Technometrics, Vol. 23, No. 2 (May, 1981), pp. 149-154
+
+
+\end{document}
